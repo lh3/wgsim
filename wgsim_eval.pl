@@ -24,12 +24,12 @@ if ($command eq 'alneval') {
 } elsif ($command eq 'uniqcmp') {
 	&uniqcmp;
 } else {
-	die('[wgsim_eval] unrecognized command.\n');
+	die("[wgsim_eval] unrecognized command.\n");
 }
 exit;
 
 sub alneval {
-	my %opts = (g=>5);
+	my %opts = (g=>20);
 	getopts('pag:', \%opts);
 	die(qq/
 Usage:   wgsim_eval.pl alneval [options] <in.sam>\n
