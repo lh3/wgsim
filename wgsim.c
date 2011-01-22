@@ -1,6 +1,7 @@
 /* The MIT License
 
    Copyright (c) 2008 Genome Research Ltd (GRL).
+                 2011 Heng Li <lh3@live.co.uk>
 
    Permission is hereby granted, free of charge, to any person obtaining
    a copy of this software and associated documentation files (the
@@ -23,11 +24,8 @@
    SOFTWARE.
 */
 
-/* Contact: Heng Li <lh3@sanger.ac.uk> */
-
 /* This program is separated from maq's read simulator with Colin
- * Hercus' modification to allow longer indels. Colin is the chief
- * developer of novoalign. */
+ * Hercus' modification to allow longer indels. */
 
 #include <stdlib.h>
 #include <math.h>
@@ -101,6 +99,7 @@ static double ERR_RATE = 0.02;
 static double MUT_RATE = 0.001;
 static double INDEL_FRAC = 0.15;
 static double INDEL_EXTEND = 0.3;
+static double MAX_N_RATIO = 0.1;
 
 void wgsim_mut_diref(const kseq_t *ks, int is_hap, mutseq_t *hap1, mutseq_t *hap2)
 {
@@ -175,8 +174,9 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
 				} else if (((c[1] & mutmsk) >> 12) <= 5) { // ins
 					printf("-\t");
                     int n = (c[1]&mutmsk) >> 12, ins = c[1] >> 4;
-                    while(n > 0) {
+                    while (n > 0) {
                         putchar("ACGTN"[ins & 0x3]);
+						ins >>= 2;
                         n--;
                     }
                     printf("\t-\n");
@@ -193,6 +193,7 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
                     int n = (c[1]&mutmsk) >> 12, ins = c[1] >> 4;
                     while (n > 0) {
                         putchar("ACGTN"[ins & 0x3]);
+						ins >>= 2;
                         n--;
                     }
                     printf("\t+\n");
@@ -314,15 +315,24 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, gzFile fp_fa, int is_hap, uint64_t N
 
 			// generate sequencing errors
 			for (j = 0; j < 2; ++j) {
+				int n_n = 0;
 				for (i = 0; i < s[j]; ++i) {
 					int c = tmp_seq[j][i];
-					if (c >= 4) c = 4; // actually c should be never larger than 4 if everything is correct
-					else if (drand48() < ERR_RATE) {
-						c = (c + (int)(drand48() * 3.0 + 1)) & 3;
+					if (c >= 4) { // actually c should be never larger than 4 if everything is correct
+						c = 4;
+						++n_n;
+					} else if (drand48() < ERR_RATE) {
+						// c = (c + (int)(drand48() * 3.0 + 1)) & 3; // random sequencing errors
+						c = (c + 1) & 3; // recurrent sequencing errors
 						++n_err[j];
 					}
 					tmp_seq[j][i] = c;
 				}
+				if ((double)n_n / s[j] > MAX_N_RATIO) break;
+			}
+			if (j < 2) { // too many ambiguous bases on one of the reads
+				--ii;
+				continue;
 			}
 
 			// print
@@ -376,7 +386,7 @@ int main(int argc, char *argv[])
 
 	N = 1000000; dist = 500; std_dev = 50;
 	size_l = size_r = 70;
-	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S")) >= 0) {
+	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S:")) >= 0) {
 		switch (c) {
 		case 'd': dist = atoi(optarg); break;
 		case 's': std_dev = atoi(optarg); break;
@@ -395,8 +405,11 @@ int main(int argc, char *argv[])
 	fp_fa = strcmp(argv[optind+0], "-")? gzopen(argv[optind], "r") : gzdopen(fileno(stdin), "r");
 	fpout1 = fopen(argv[optind+1], "w");
 	fpout2 = fopen(argv[optind+2], "w");
-	if (seed < 0) seed = time(0);
-	srand48(seed);
+	if (!fp_fa || !fpout1 || !fpout2) {
+		fprintf(stderr, "[wgsim] file open error\n");
+		return 1;
+	}
+	srand48(seed > 0? seed : time(0));
 	wgsim_core(fpout1, fpout2, fp_fa, is_hap, N, dist, std_dev, size_l, size_r);
 
 	fclose(fpout1); fclose(fpout2); gzclose(fp_fa);
