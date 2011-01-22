@@ -1,0 +1,30 @@
+Introduction
+============
+
+Wgsim is a small tool for simulating sequence reads from a reference genome.
+It is able to simulate diploid genomes with SNPs and insertion/deletion (INDEL)
+polymorphisms, and simulate reads with uniform substitution sequencing errors.
+It does not generate INDEL sequencing errors, but this can be partly
+compensated by simulating INDEL polymorphisms.
+
+Wgsim outputs the simulated polymorphisms, and writes the true read coordinates
+as well as the number of polymorphisms and sequencing errors in read names.
+One can evaluate the accuracy of a mapper or a SNP caller with wgsim_eval.pl
+that comes with the package.
+
+
+Compilation
+===========
+
+gcc -g -O2 -Wall -o wgsim wgsim.c -lz
+
+
+History
+=======
+
+Wgsim was modified from MAQ's read simulator by dropping dependencies to other
+source codes in the MAQ package and incorporating patches from Colin Hercus
+which allow to simulate INDELs longer than 1bp. Wgsim was originally released
+in the SAMtools software package. I forked it out in 2011 as a standalone
+project. A few improvements were also added in this course.
+
