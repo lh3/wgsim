@@ -212,10 +212,11 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
 	}
 }
 
-void wgsim_core(FILE *fpout1, FILE *fpout2, gzFile fp_fa, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
+void wgsim_core(FILE *fpout1, FILE *fpout2, const char *fn, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
 {
 	kseq_t *ks;
     mutseq_t rseq[2];
+	gzFile fp_fa;
 	uint64_t tot_len, ii;
 	int i, l, n_ref;
 	char *qstr;
@@ -232,6 +233,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, gzFile fp_fa, int is_hap, uint64_t N
 
 	Q = (ERR_RATE == 0.0)? 'I' : (int)(-10.0 * log(ERR_RATE) / log(10.0) + 0.499) + 33;
 
+	fp_fa = gzopen(fn, "r");
 	ks = kseq_init(fp_fa);
 	tot_len = n_ref = 0;
 	fprintf(stderr, "[%s] calculating the total length of the reference sequence...\n", __func__);
@@ -241,8 +243,9 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, gzFile fp_fa, int is_hap, uint64_t N
 	}
 	fprintf(stderr, "[%s] %d sequences, total length: %llu\n", __func__, n_ref, (long long)tot_len);
 	kseq_destroy(ks);
-	gzrewind(fp_fa);
+	gzclose(fp_fa);
 
+	fp_fa = gzopen(fn, "r");
 	ks = kseq_init(fp_fa);
 	while ((l = kseq_read(ks)) >= 0) {
 		uint64_t n_pairs = (uint64_t)((long double)l / tot_len * N + 0.5);
@@ -350,6 +353,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, gzFile fp_fa, int is_hap, uint64_t N
 		free(rseq[0].s); free(rseq[1].s);
 	}
 	kseq_destroy(ks);
+	gzclose(fp_fa);
 	free(qstr);
 	free(tmp_seq[0]); free(tmp_seq[1]);
 }
@@ -381,7 +385,6 @@ int main(int argc, char *argv[])
 	int64_t N;
 	int dist, std_dev, c, size_l, size_r, is_hap = 0;
 	FILE *fpout1, *fpout2;
-	gzFile fp_fa;
 	int seed = -1;
 
 	N = 1000000; dist = 500; std_dev = 50;
@@ -402,16 +405,15 @@ int main(int argc, char *argv[])
 		}
 	}
 	if (argc - optind < 3) return simu_usage();
-	fp_fa = strcmp(argv[optind+0], "-")? gzopen(argv[optind], "r") : gzdopen(fileno(stdin), "r");
 	fpout1 = fopen(argv[optind+1], "w");
 	fpout2 = fopen(argv[optind+2], "w");
-	if (!fp_fa || !fpout1 || !fpout2) {
+	if (!fpout1 || !fpout2) {
 		fprintf(stderr, "[wgsim] file open error\n");
 		return 1;
 	}
 	srand48(seed > 0? seed : time(0));
-	wgsim_core(fpout1, fpout2, fp_fa, is_hap, N, dist, std_dev, size_l, size_r);
+	wgsim_core(fpout1, fpout2, argv[optind], is_hap, N, dist, std_dev, size_l, size_r);
 
-	fclose(fpout1); fclose(fpout2); gzclose(fp_fa);
+	fclose(fpout1); fclose(fpout2);
 	return 0;
 }
