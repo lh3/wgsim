@@ -40,7 +40,7 @@
 #include "kseq.h"
 KSEQ_INIT(gzFile, gzread)
 
-#define PACKAGE_VERSION "0.3.0-r10"
+#define PACKAGE_VERSION "0.3.0-r11"
 
 const uint8_t nst_nt4_table[256] = {
 	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
@@ -375,7 +375,7 @@ static int simu_usage()
 	fprintf(stderr, "         -R FLOAT      fraction of indels [%.2f]\n", INDEL_FRAC);
 	fprintf(stderr, "         -X FLOAT      probability an indel is extended [%.2f]\n", INDEL_EXTEND);
 	fprintf(stderr, "         -S INT        seed for random generator [-1]\n");
-	frpintf(stderr, "         -A FLOAT      disgard if the fraction of ambiguous bases higher than FLOAT [%.2f]\n", MAX_N_RATIO);
+	fprintf(stderr, "         -A FLOAT      disgard if the fraction of ambiguous bases higher than FLOAT [%.2f]\n", MAX_N_RATIO);
 	fprintf(stderr, "         -h            haplotype mode\n");
 	fprintf(stderr, "\n");
 	return 1;
