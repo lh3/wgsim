@@ -314,9 +314,26 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, const char *fn, int is_hap, uint64_t
 					} else {											\
 						int n, ins;										\
 						++n_indel[x];									\
-						tmp_seq[x][k++] = c & 0xf;						\
-						for (n = mut_type>>12, ins = c>>4; n > 0 && k < s[x]; --n, ins >>= 2) \
-							tmp_seq[x][k++] = ins & 0x3;				\
+						int len = mut_type>>12;							\
+						if (x == 0) {									\
+							tmp_seq[x][k++] = c & 0xf;					\
+							for (n = len, ins = c>>4; n > 0 && k < s[x]; --n, ins >>= 2) \
+								tmp_seq[x][k++] = ins & 0x3;			\
+						}												\
+						if (x == 1)	{									\
+							for (n = len, ins = c>>4; n > 0 && k < s[x]; --n, ins >>= 2) { \
+								int idx = k + n - 1;						\
+								if (idx < s[x]) {						\
+									tmp_seq[x][idx] = ins & 0x3;        \
+								}										\
+							}											\
+							k = k + len;								\
+							if (k > s[x]) {								\
+								k = s[x];								\
+							}											\
+							if (k < s[x])								\
+								tmp_seq[x][k++] = c & 0xf;				\
+						}												\
 					}													\
 				}														\
 				if (k != s[x]) ext_coor[x] = -10;						\
