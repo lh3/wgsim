@@ -381,16 +381,16 @@ static int simu_usage()
 	fprintf(stderr, "Contact: Andrew Tritt <ajtritt@lbl.gov>\n\n");
 	fprintf(stderr, "Usage:   wgsim [options] <in.nwk> <num_taxa> <out.read1.fq> <out.read2.fq>\n\n");
 	fprintf(stderr, "Options: -e FLOAT      base error rate [%.3f]\n", ERR_RATE);
-	fprintf(stderr, "         -d INT        outer distance between the two ends [500]\n");
+	fprintf(stderr, "         -d INT        outer distance between the two ends [270]\n");
 	fprintf(stderr, "         -s INT        standard deviation [50]\n");
 	fprintf(stderr, "         -N INT        number of read pairs [1000000]\n");
-	fprintf(stderr, "         -1 INT        length of the first read [70]\n");
-	fprintf(stderr, "         -2 INT        length of the second read [70]\n");
+	fprintf(stderr, "         -1 INT        length of the first read [150]\n");
+	fprintf(stderr, "         -2 INT        length of the second read [150]\n");
 	fprintf(stderr, "         -r FLOAT      rate of mutations [%.4f]\n", MUT_RATE);
 	fprintf(stderr, "         -R FLOAT      fraction of indels [%.2f]\n", INDEL_FRAC);
 	fprintf(stderr, "         -X FLOAT      probability an indel is extended [%.2f]\n", INDEL_EXTEND);
 	fprintf(stderr, "         -S INT        seed for random generator [-1]\n");
-	fprintf(stderr, "         -A FLOAT      disgard if the fraction of ambiguous bases higher than FLOAT [%.2f]\n", MAX_N_RATIO);
+	fprintf(stderr, "         -A FLOAT      discard if the fraction of ambiguous bases higher than FLOAT [%.2f]\n", MAX_N_RATIO);
 	fprintf(stderr, "         -h            haplotype mode\n");
 	fprintf(stderr, "\n");
 	return 1;
@@ -404,8 +404,8 @@ int main(int argc, char *argv[])
 	int seed = -1;
     int n_taxa, i;
 
-	N = 1000000; dist = 500; std_dev = 50;
-	size_l = size_r = 70;
+	N = 1000000; dist = 270; std_dev = 50;
+	size_l = size_r = 150;
 	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S:A:")) >= 0) {
 		switch (c) {
 		case 'd': dist = atoi(optarg); break;
