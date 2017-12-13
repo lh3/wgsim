@@ -95,21 +95,19 @@ void shift_weights(double * cum, int idx, int len) {
     cum[len-1] = -1.0;
 }
 
-char ** sample_tree(char * nwk_path) {
+char ** sample_tree(char * nwk_path, int nsamples) {
 
     FILE *file = fopen(nwk_path, "r");
     char *code;
     size_t n = 0;
     int c;
 
-    if (file == NULL) return 1; //could not open file
+    if (file == NULL) return NULL; //could not open file
     // compute file size
     fseek(file, 0, SEEK_END);
     long f_size = ftell(file);
     fseek(file, 0, SEEK_SET);
     code = malloc(f_size);
-
-    int nsamples = atoi(argv[2]);
 
     // read in newick string
     int internodes_n = 0;
