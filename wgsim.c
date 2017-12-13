@@ -38,44 +38,45 @@
 #include <string.h>
 #include <zlib.h>
 #include "kseq.h"
+#include "tree.h"
 KSEQ_INIT(gzFile, gzread)
 
-#define PACKAGE_VERSION "0.3.1-r13"
+#define PACKAGE_VERSION "0.1"
 
 const uint8_t nst_nt4_table[256] = {
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
 	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 5 /*'-'*/, 4, 4,
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 0, 4, 1,  4, 4, 4, 2,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  3, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 0, 4, 1,  4, 4, 4, 2,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  3, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
-	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4, 
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 0, 4, 1,  4, 4, 4, 2,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  3, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 0, 4, 1,  4, 4, 4, 2,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  3, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
+	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
 	4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4
 };
 
 /* Simple normal random number generator, copied from genran.c */
 
 double ran_normal()
-{ 
-	static int iset = 0; 
-	static double gset; 
-	double fac, rsq, v1, v2; 
+{
+	static int iset = 0;
+	static double gset;
+	double fac, rsq, v1, v2;
 	if (iset == 0) {
-		do { 
+		do {
 			v1 = 2.0 * drand48() - 1.0;
-			v2 = 2.0 * drand48() - 1.0; 
+			v2 = 2.0 * drand48() - 1.0;
 			rsq = v1 * v1 + v2 * v2;
 		} while (rsq >= 1.0 || rsq == 0.0);
-		fac = sqrt(-2.0 * log(rsq) / rsq); 
-		gset = v1 * fac; 
+		fac = sqrt(-2.0 * log(rsq) / rsq);
+		gset = v1 * fac;
 		iset = 1;
 		return v2 * fac;
 	} else {
@@ -377,8 +378,8 @@ static int simu_usage()
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Program: wgsim (short read simulator)\n");
 	fprintf(stderr, "Version: %s\n", PACKAGE_VERSION);
-	fprintf(stderr, "Contact: Heng Li <lh3@sanger.ac.uk>\n\n");
-	fprintf(stderr, "Usage:   wgsim [options] <in.ref.fa> <out.read1.fq> <out.read2.fq>\n\n");
+	fprintf(stderr, "Contact: Andrew Tritt <ajtritt@lbl.gov>\n\n");
+	fprintf(stderr, "Usage:   wgsim [options] <in.nwk> <num_taxa> <out.read1.fq> <out.read2.fq>\n\n");
 	fprintf(stderr, "Options: -e FLOAT      base error rate [%.3f]\n", ERR_RATE);
 	fprintf(stderr, "         -d INT        outer distance between the two ends [500]\n");
 	fprintf(stderr, "         -s INT        standard deviation [50]\n");
@@ -401,6 +402,7 @@ int main(int argc, char *argv[])
 	int dist, std_dev, c, size_l, size_r, is_hap = 0;
 	FILE *fpout1, *fpout2;
 	int seed = -1;
+    int n_taxa, i;
 
 	N = 1000000; dist = 500; std_dev = 50;
 	size_l = size_r = 70;
@@ -420,17 +422,28 @@ int main(int argc, char *argv[])
 		case 'h': is_hap = 1; break;
 		}
 	}
-	if (argc - optind < 3) return simu_usage();
-	fpout1 = fopen(argv[optind+1], "w");
-	fpout2 = fopen(argv[optind+2], "w");
+	if (argc - optind < 4) return simu_usage();
+    n_taxa = atoi(argv[optind+1]);
+	fpout1 = fopen(argv[optind+2], "w");
+	fpout2 = fopen(argv[optind+3], "w");
 	if (!fpout1 || !fpout2) {
 		fprintf(stderr, "[wgsim] file open error\n");
 		return 1;
 	}
 	if (seed <= 0) seed = time(0)&0x7fffffff;
-	fprintf(stderr, "[wgsim] seed = %d\n", seed);
 	srand48(seed);
-	wgsim_core(fpout1, fpout2, argv[optind], is_hap, N, dist, std_dev, size_l, size_r);
+	fprintf(stderr, "[wgsim] seed = %d\n", seed);
+
+    char ** leaves = sample_tree(argv[optind], n_taxa);
+    double * abund = calc_abund(n_taxa);
+    int n_pairs;
+    for (i = 0; i < n_taxa; i++) {
+        char buf[128];
+        snprintf(buf, 128, "%s.fasta", leaves[i]);
+        n_pairs = (int) N * abund[i];
+	    wgsim_core(fpout1, fpout2, buf, is_hap, n_pairs, dist, std_dev, size_l, size_r);
+    }
+	//wgsim_core(fpout1, fpout2, argv[optind], is_hap, N, dist, std_dev, size_l, size_r);
 
 	fclose(fpout1); fclose(fpout2);
 	return 0;
