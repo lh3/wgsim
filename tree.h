@@ -104,7 +104,7 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     fseek(file, 0, SEEK_END);
     long f_size = ftell(file);
     fseek(file, 0, SEEK_SET);
-    code = malloc(f_size);
+    code = (char *) malloc(f_size);
 
     // read in newick string
     int internodes_n = 0;
@@ -136,7 +136,8 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     // parse newick string and compute weights
     i = 0;
     int * id = &i;
-    read_tree(&code, curr_dist, weights, names, id);
+    char * nwk_ptr = code;
+    read_tree(&nwk_ptr, curr_dist, weights, names, id);
 
     // compute cumulative weights
     double * cum_weights = (double*) malloc(sizeof(double)*nleaves);
