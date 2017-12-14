@@ -96,6 +96,11 @@ typedef struct {
 	mut_t *s; /* sequence */
 } mutseq_t;
 
+typedef struct {
+    const char * fn; /* the fasta file path */
+    uint64_t tot_len;
+} ref_t;
+
 static double ERR_RATE = 0.02;
 static double MUT_RATE = 0.001;
 static double INDEL_FRAC = 0.15;
@@ -227,13 +232,38 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
 	}
 }
 
-void wgsim_core(FILE *fpout1, FILE *fpout2, const char *fn, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
+ref_t * read_seq(const char *fn){
+	gzFile fp_fa;
+    int l, n_ref;
+    uint64_t tot_len;
+	kseq_t *ks;
+
+	fp_fa = gzopen(fn, "r");
+	ks = kseq_init(fp_fa);
+	tot_len = n_ref = 0;
+	fprintf(stderr, "[%s] calculating the total length of the reference sequence...\n", __func__);
+	while ((l = kseq_read(ks)) >= 0) {
+		tot_len += l;
+		++n_ref;
+	}
+
+    ref_t * ret = (ref_t*) malloc(sizeof(ref_t));
+    ret->fn = fn;
+    ret->tot_len = tot_len;
+
+	fprintf(stderr, "[%s] %d sequences, total length: %llu\n", __func__, n_ref, (long long)tot_len);
+	kseq_destroy(ks);
+	gzclose(fp_fa);
+    return ret;
+}
+
+void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
 {
 	kseq_t *ks;
     mutseq_t rseq[2];
 	gzFile fp_fa;
-	uint64_t tot_len, ii;
-	int i, l, n_ref;
+	uint64_t ii;
+	int i, l;
 	char *qstr;
 	int size[2], Q, max_size;
 	uint8_t *tmp_seq[2];
@@ -248,22 +278,10 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, const char *fn, int is_hap, uint64_t
 
 	Q = (ERR_RATE == 0.0)? 'I' : (int)(-10.0 * log(ERR_RATE) / log(10.0) + 0.499) + 33;
 
-	fp_fa = gzopen(fn, "r");
-	ks = kseq_init(fp_fa);
-	tot_len = n_ref = 0;
-	fprintf(stderr, "[%s] calculating the total length of the reference sequence...\n", __func__);
-	while ((l = kseq_read(ks)) >= 0) {
-		tot_len += l;
-		++n_ref;
-	}
-	fprintf(stderr, "[%s] %d sequences, total length: %llu\n", __func__, n_ref, (long long)tot_len);
-	kseq_destroy(ks);
-	gzclose(fp_fa);
-
-	fp_fa = gzopen(fn, "r");
+	fp_fa = gzopen(ref->fn, "r");
 	ks = kseq_init(fp_fa);
 	while ((l = kseq_read(ks)) >= 0) {
-		uint64_t n_pairs = (uint64_t)((long double)l / tot_len * N + 0.5);
+		uint64_t n_pairs = (uint64_t)((long double)l / ref->tot_len * N + 0.5);
 		if (l < dist + 3 * std_dev) {
 			fprintf(stderr, "[%s] skip sequence '%s' as it is shorter than %d!\n", __func__, ks->name.s, dist + 3 * std_dev);
 			continue;
@@ -437,12 +455,15 @@ int main(int argc, char *argv[])
     char ** leaves = sample_tree(argv[optind], n_taxa);
     double * abund = calc_abund(n_taxa);
     int n_pairs;
+    ref_t * refs = (ref_t*) malloc(n_taxa*sizeof(ref_t));
+    char * fn;
     for (i = 0; i < n_taxa; i++) {
-        char buf[128];
-        snprintf(buf, 128, "%s.fasta", leaves[i]);
-        n_pairs = (int) N * abund[i];
-	    wgsim_core(fpout1, fpout2, buf, is_hap, n_pairs, dist, std_dev, size_l, size_r);
+        fn = (char *) malloc(128*sizeof(char));
+        snprintf(fn, 128, "%s.fasta", leaves[i]);
+        printf("Looking for %s in %s\n", leaves[i], fn);
     }
+
+	    //wgsim_core(fpout1, fpout2, buf, is_hap, n_pairs, dist, std_dev, size_l, size_r);
 	//wgsim_core(fpout1, fpout2, argv[optind], is_hap, N, dist, std_dev, size_l, size_r);
 
 	fclose(fpout1); fclose(fpout2);
