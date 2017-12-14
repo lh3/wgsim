@@ -8,8 +8,6 @@ void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** na
     char *name = malloc(256), *blen = malloc(256);
     size_t name_n = 0, blen_n = 0;
 
-    int nleaves = 0;
-
     int read_blen = 0;
     char c = *nwk;
     int s = *id;
@@ -35,7 +33,6 @@ void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** na
         } else if (c == ':') {  // read branch length
             if (name_n > 0){   // we were reading a leaf node
                 name[name_n] = '\0';
-                nleaves = 1;
                 names[(*id)++] = name;
             }
             read_blen = 1;
@@ -178,7 +175,6 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     free(weights);
     free(cum_weights);
     free(node_ids);
-    free(id);
     free(code);
     return ret;
 }
