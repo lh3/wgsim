@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include "xrand.h"
 
 void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** names, int * id) {
     char * nwk = *nwk_ptr;
@@ -158,25 +159,34 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     int rem_leaves = nleaves;
     double U;
     int tmp;
+    double r;
     for (i = 0; i < nsamples; i++){
-        U = cum_weights[rem_leaves-1]*rand()/RAND_MAX;  // draw random number
+        r = xdrand();
+        U = cum_weights[rem_leaves-1]*r;  // draw random number
         idx = binsearch(cum_weights, 0, rem_leaves, U); // get index
         shift_weights(cum_weights, idx, rem_leaves);    // update weights
         tmp = node_ids[idx];
+        fprintf(stderr, "before: %s, r = %0.12f\n", names[node_ids[idx]], r); 
         node_ids[idx] = node_ids[rem_leaves-1];
-        node_ids[rem_leaves] = tmp;
+        node_ids[rem_leaves-1] = tmp;
         rem_leaves--;
     }
 
+    tmp = rem_leaves;
+    for (i = 0; i < tmp; i++){
+        free(names[node_ids[i]]);
+    }
     char ** ret = (char **) malloc(nsamples * sizeof(char *));
-    for (i = rem_leaves; i < nleaves; i++){
-        ret[i-rem_leaves] = names[node_ids[i]];
+    for (i = tmp; i < nleaves; i++){
+        fprintf(stderr, "after: %s\n", names[node_ids[i]]); 
+        ret[i-tmp] = names[node_ids[i]];
     }
     free(curr_dist);
     free(weights);
     free(cum_weights);
     free(node_ids);
     free(code);
+    free(names);
     return ret;
 }
 
@@ -185,7 +195,7 @@ double * calc_abund(int nsamples) {
     double sum = 0.0;
     int i;
     for (i = 0; i < nsamples; i++){
-        abundance[i] = -log(-((double) rand())/RAND_MAX + 1);
+        abundance[i] = -log(-xdrand() + 1);
         sum += abundance[i];
     }
     for (i = 0; i < nsamples; i++)
