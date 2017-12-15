@@ -39,6 +39,7 @@
 #include <zlib.h>
 #include "kseq.h"
 #include "tree.h"
+#include "xrand.h"
 KSEQ_INIT(gzFile, gzread)
 
 #define PACKAGE_VERSION "0.1"
@@ -71,8 +72,8 @@ double ran_normal()
 	double fac, rsq, v1, v2;
 	if (iset == 0) {
 		do {
-			v1 = 2.0 * drand48() - 1.0;
-			v2 = 2.0 * drand48() - 1.0;
+			v1 = 2.0 * xdrand() - 1.0; // drand48
+			v2 = 2.0 * xdrand() - 1.0; // drand48
 			rsq = v1 * v1 + v2 * v2;
 		} while (rsq >= 1.0 || rsq == 0.0);
 		fac = sqrt(-2.0 * log(rsq) / rsq);
@@ -99,6 +100,8 @@ typedef struct {
 typedef struct {
     const char * fn; /* the fasta file path */
     uint64_t tot_len;
+    uint64_t wlen;
+    int n_ref;
 } ref_t;
 
 static double ERR_RATE = 0.02;
@@ -121,41 +124,41 @@ void wgsim_mut_diref(const kseq_t *ks, int is_hap, mutseq_t *hap1, mutseq_t *hap
 		int c;
 		c = ret[0]->s[i] = ret[1]->s[i] = (mut_t)nst_nt4_table[(int)ks->seq.s[i]];
         if (deleting) {
-            if (drand48() < INDEL_EXTEND) {
+            if (xdrand() < INDEL_EXTEND) { // drand48
                 if (deleting & 1) ret[0]->s[i] |= DELETE;
                 if (deleting & 2) ret[1]->s[i] |= DELETE;
                 continue;
             } else deleting = 0;
         }
-		if (c < 4 && drand48() < MUT_RATE) { // mutation
-			if (drand48() >= INDEL_FRAC) { // substitution
-				double r = drand48();
+		if (c < 4 && xdrand() < MUT_RATE) { // mutation
+			if (xdrand() >= INDEL_FRAC) { // substitution // drand48
+				double r = xdrand(); // drand48
 				c = (c + (int)(r * 3.0 + 1)) & 3;
-				if (is_hap || drand48() < 0.333333) { // hom
+				if (is_hap || xdrand() < 0.333333) { // hom // drand48
 					ret[0]->s[i] = ret[1]->s[i] = SUBSTITUTE|c;
 				} else { // het
-					ret[drand48()<0.5?0:1]->s[i] = SUBSTITUTE|c;
+					ret[xdrand()<0.5?0:1]->s[i] = SUBSTITUTE|c; // drand48
 				}
 			} else { // indel
-				if (drand48() < 0.5) { // deletion
-					if (is_hap || drand48() < 0.333333) { // hom-del
+				if (xdrand() < 0.5) { // deletion // drand48
+					if (is_hap || xdrand() < 0.333333) { // hom-del // drand48
 						ret[0]->s[i] = ret[1]->s[i] = DELETE;
                         deleting = 3;
 					} else { // het-del
-                        deleting = drand48()<0.5?1:2;
+                        deleting = xdrand()<0.5?1:2; // drand48
 						ret[deleting-1]->s[i] = DELETE;
 					}
 				} else { // insertion
                     int num_ins = 0, ins = 0;
                     do {
                         num_ins++;
-                        ins = (ins << 2) | (int)(drand48() * 4.0);
-                    } while (num_ins < 4 && drand48() < INDEL_EXTEND);
+                        ins = (ins << 2) | (int)(xdrand() * 4.0); // drand48
+                    } while (num_ins < 4 && xdrand() < INDEL_EXTEND); // drand48
 
-					if (is_hap || drand48() < 0.333333) { // hom-ins
+					if (is_hap || xdrand() < 0.333333) { // hom-ins // drand48
 						ret[0]->s[i] = ret[1]->s[i] = (num_ins << 12) | (ins << 4) | c;
 					} else { // het-ins
-						ret[drand48()<0.5?0:1]->s[i] = (num_ins << 12) | (ins << 4) | c;
+						ret[xdrand()<0.5?0:1]->s[i] = (num_ins << 12) | (ins << 4) | c; // drand48
 					}
 				}
 			}
@@ -232,7 +235,7 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
 	}
 }
 
-ref_t * read_seq(const char *fn){
+void read_seq(const char *fn, ref_t * ref){
 	gzFile fp_fa;
     int l, n_ref;
     uint64_t tot_len;
@@ -241,20 +244,19 @@ ref_t * read_seq(const char *fn){
 	fp_fa = gzopen(fn, "r");
 	ks = kseq_init(fp_fa);
 	tot_len = n_ref = 0;
-	fprintf(stderr, "[%s] calculating the total length of the reference sequence...\n", __func__);
+	fprintf(stderr, "[%s] calculating the total length of the reference sequence %s...\n", __func__, fn);
 	while ((l = kseq_read(ks)) >= 0) {
 		tot_len += l;
 		++n_ref;
 	}
 
-    ref_t * ret = (ref_t*) malloc(sizeof(ref_t));
-    ret->fn = fn;
-    ret->tot_len = tot_len;
+    ref->fn = fn;
+    ref->tot_len = tot_len;
+    ref->n_ref = n_ref;
 
-	fprintf(stderr, "[%s] %d sequences, total length: %llu\n", __func__, n_ref, (long long)tot_len);
+	fprintf(stderr, "[%s] %d sequences in %s, total length: %llu\n", __func__, n_ref, fn, (long long)tot_len);
 	kseq_destroy(ks);
 	gzclose(fp_fa);
-    return ret;
 }
 
 void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
@@ -265,7 +267,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 	uint64_t ii;
 	int i, l;
 	char *qstr;
-	int size[2], Q, max_size;
+	int /*size[2],*/ Q, max_size;
 	uint8_t *tmp_seq[2];
     mut_t *target;
 
@@ -273,7 +275,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 	qstr = (char*)calloc(l+1, 1);
 	tmp_seq[0] = (uint8_t*)calloc(l+2, 1);
 	tmp_seq[1] = (uint8_t*)calloc(l+2, 1);
-	size[0] = size_l; size[1] = size_r;
+	//size[0] = size_l; size[1] = size_r;
 	max_size = size_l > size_r? size_l : size_r;
 
 	Q = (ERR_RATE == 0.0)? 'I' : (int)(-10.0 * log(ERR_RATE) / log(10.0) + 0.499) + 33;
@@ -291,32 +293,38 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 		wgsim_mut_diref(ks, is_hap, rseq, rseq+1);
 		wgsim_print_mutref(ks->name.s, ks, rseq, rseq+1);
 
+	    FILE *fpo[] = { fpout1, fpout2 };
+        int s[] = { size_l, size_r };
 		for (ii = 0; ii != n_pairs; ++ii) { // the core loop
 			double ran;
-			int d, pos, s[2], is_flip = 0;
+			int d, pos, /*s[2],*/ order[2], is_flip = 0;
 			int n_sub[2], n_indel[2], n_err[2], ext_coor[2], j, k;
-			FILE *fpo[2];
+			//FILE *fpo[2];
 
 			do { // avoid boundary failure
 				ran = ran_normal();
 				ran = ran * std_dev + dist;
 				d = (int)(ran + 0.5);
 				d = d > max_size? d : max_size;
-				pos = (int)((l - d + 1) * drand48());
+				pos = (int)((l - d + 1) * xdrand()); // drand48
 			} while (pos < 0 || pos >= ks->seq.l || pos + d - 1 >= ks->seq.l);
 
 			// flip or not
-			if (drand48() < 0.5) {
-				fpo[0] = fpout1; fpo[1] = fpout2;
-				s[0] = size[0]; s[1] = size[1];
+			if (xdrand() < 0.5) { // drand48
+				//fpo[0] = fpout1; fpo[1] = fpout2;
+				//s[0] = size[0]; s[1] = size[1];
+                order[0] = 0;
+                order[1] = 1;
 			} else {
-				fpo[1] = fpout1; fpo[0] = fpout2;
-				s[1] = size[0]; s[0] = size[1];
+				//fpo[1] = fpout1; fpo[0] = fpout2;
+				//s[1] = size[0]; s[0] = size[1];
+                order[0] = 1;
+                order[1] = 0;
 				is_flip = 1;
 			}
 
 			// generate the read sequences
-			target = rseq[drand48()<0.5?0:1].s; // haplotype from which the reads are generated
+			target = rseq[xdrand()<0.5?0:1].s; // haplotype from which the reads are generated // drand48
 			n_sub[0] = n_sub[1] = n_indel[0] = n_indel[1] = n_err[0] = n_err[1] = 0;
 
 #define __gen_read(x, start, iter) do {									\
@@ -357,8 +365,8 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 					if (c >= 4) { // actually c should be never larger than 4 if everything is correct
 						c = 4;
 						++n_n;
-					} else if (drand48() < ERR_RATE) {
-						// c = (c + (int)(drand48() * 3.0 + 1)) & 3; // random sequencing errors
+					} else if (xdrand() < ERR_RATE) { // drand48
+						// c = (c + (int)(xdrand() * 3.0 + 1)) & 3; // random sequencing errors // drand48
 						c = (c + 1) & 3; // recurrent sequencing errors
 						++n_err[j];
 					}
@@ -372,7 +380,8 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 			}
 
 			// print
-			for (j = 0; j < 2; ++j) {
+			for (k = 0; k < 2; ++k) {
+                j = order[k];
 				for (i = 0; i < s[j]; ++i) qstr[i] = Q;
 				qstr[i] = 0;
 				fprintf(fpo[j], "@%s_%u_%u_%d:%d:%d_%d:%d:%d_%llx/%d\n", ks->name.s, ext_coor[0]+1, ext_coor[1]+1,
@@ -410,6 +419,7 @@ static int simu_usage()
 	fprintf(stderr, "         -S INT        seed for random generator [-1]\n");
 	fprintf(stderr, "         -A FLOAT      discard if the fraction of ambiguous bases higher than FLOAT [%.2f]\n", MAX_N_RATIO);
 	fprintf(stderr, "         -h            haplotype mode\n");
+	fprintf(stderr, "         -f STR        the directory containing input FastA files [.]\n");
 	fprintf(stderr, "\n");
 	return 1;
 }
@@ -421,10 +431,11 @@ int main(int argc, char *argv[])
 	FILE *fpout1, *fpout2;
 	int seed = -1;
     int n_taxa, i;
+    char * indir = ".";
 
 	N = 1000000; dist = 270; std_dev = 50;
 	size_l = size_r = 150;
-	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S:A:")) >= 0) {
+	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S:A:f:")) >= 0) {
 		switch (c) {
 		case 'd': dist = atoi(optarg); break;
 		case 's': std_dev = atoi(optarg); break;
@@ -438,6 +449,7 @@ int main(int argc, char *argv[])
 		case 'A': MAX_N_RATIO = atof(optarg); break;
 		case 'S': seed = atoi(optarg); break;
 		case 'h': is_hap = 1; break;
+		case 'f': indir = optarg; break;
 		}
 	}
 	if (argc - optind < 4) return simu_usage();
@@ -448,22 +460,40 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "[wgsim] file open error\n");
 		return 1;
 	}
-	if (seed <= 0) seed = time(0)&0x7fffffff;
-	srand48(seed);
-	fprintf(stderr, "[wgsim] seed = %d\n", seed);
+	//if (seed <= 0) seed = time(0)&0x7fffffff;
+	if (seed <= 0) seed = time(NULL);
+    srand(seed);
+    int rseed = rand();
+	//srand48(seed);
+	//xsrand(seed-1513299303);
+	xsrand(seed);
+	fprintf(stderr, "[wgsim] seed = %d, rseed = %d\n", seed, rseed);
 
+    fprintf(stderr, "[wgsim] sampling tree\n");
     char ** leaves = sample_tree(argv[optind], n_taxa);
+    fprintf(stderr, "[wgsim] calculating abundances\n");
     double * abund = calc_abund(n_taxa);
-    int n_pairs;
+    double Ltot = 0.0;
     ref_t * refs = (ref_t*) malloc(n_taxa*sizeof(ref_t));
+    ref_t * tmp_ref = refs;
     char * fn;
     for (i = 0; i < n_taxa; i++) {
         fn = (char *) malloc(128*sizeof(char));
-        snprintf(fn, 128, "%s.fasta", leaves[i]);
-        printf("Looking for %s in %s\n", leaves[i], fn);
+        snprintf(fn, 128, "%s/%s.fasta", indir, leaves[i]);
+        read_seq(fn, tmp_ref);
+        fprintf(stderr, "Looking for %s in %s. Found %lld bases in %d sequences\n", leaves[i], fn, (long long) tmp_ref->tot_len, tmp_ref->n_ref);
+        tmp_ref->wlen = abund[i] * tmp_ref->tot_len;
+        Ltot += tmp_ref->wlen;
+        tmp_ref++;
+    }
+    tmp_ref = refs;
+    uint64_t n_pairs;
+    for (i = 0; i < n_taxa; i++){
+        n_pairs = (uint64_t) tmp_ref->wlen*N/Ltot;
+	    wgsim_core(fpout1, fpout2, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
+        tmp_ref++;
     }
 
-	    //wgsim_core(fpout1, fpout2, buf, is_hap, n_pairs, dist, std_dev, size_l, size_r);
 	//wgsim_core(fpout1, fpout2, argv[optind], is_hap, N, dist, std_dev, size_l, size_r);
 
 	fclose(fpout1); fclose(fpout2);
