@@ -4,7 +4,9 @@ CC = gcc
 # compiler flags:
 #  -g    adds debugging information to the executable file
 #  -Wall turns on most, but not all, compiler warnings
-CFLAGS = -g -O2 -Wall
+CFLAGS = -O2 -Wall
+
+DEBUG_FLAGS = -g -O0
 
 # library flags:
 #  -lz links zlib
@@ -12,6 +14,9 @@ CFLAGS = -g -O2 -Wall
 LIBFLAGS = -lz -lm
 
 # the build target executable:
-wgsim: wgsim.c tree.h kseq.h
+wgsim: wgsim.c tree.h kseq.h xrand.h
 	$(CC) $(CFLAGS) -o wgsim wgsim.c $(LIBFLAGS)
+
+debug: wgsim.c tree.h kseq.h xrand.h
+	$(CC) $(DEBUG_FLAGS) -o wgsim wgsim.c $(LIBFLAGS)
 
