@@ -37,6 +37,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <zlib.h>
+#include <stdarg.h>
 #include "kseq.h"
 #include "tree.h"
 #include "xrand.h"
@@ -84,6 +85,19 @@ double ran_normal()
 		iset = 0;
 		return gset;
 	}
+}
+
+void logmsg(const char * format,...) {
+    char timebuf[32];
+    time_t now = time(0);
+    strftime(timebuf, 32, "%Y-%m-%d %H:%M:%S.000", localtime(&now));
+    char format2[256];
+    snprintf(format2, 256, "%s - %s\n", timebuf, format);
+    format = format2;
+    va_list args;
+    va_start (args, format);
+    vfprintf (stderr, format, args);
+    va_end (args);
 }
 
 /* wgsim */
@@ -244,7 +258,7 @@ void read_seq(const char *fn, ref_t * ref){
 	fp_fa = gzopen(fn, "r");
 	ks = kseq_init(fp_fa);
 	tot_len = n_ref = 0;
-	fprintf(stderr, "[%s] calculating the total length of the reference sequence %s...\n", __func__, fn);
+    logmsg("[%s] calculating the total length of the reference sequence %s...", __func__, fn);
 	while ((l = kseq_read(ks)) >= 0) {
 		tot_len += l;
 		++n_ref;
@@ -254,7 +268,7 @@ void read_seq(const char *fn, ref_t * ref){
     ref->tot_len = tot_len;
     ref->n_ref = n_ref;
 
-	fprintf(stderr, "[%s] %d sequences in %s, total length: %llu\n", __func__, n_ref, fn, (long long)tot_len);
+	logmsg("[%s] %d sequences in %s, total length: %llu", __func__, n_ref, fn, (long long)tot_len);
 	kseq_destroy(ks);
 	gzclose(fp_fa);
 }
@@ -285,7 +299,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 	while ((l = kseq_read(ks)) >= 0) {
 		uint64_t n_pairs = (uint64_t)((long double)l / ref->tot_len * N + 0.5);
 		if (l < dist + 3 * std_dev) {
-			fprintf(stderr, "[%s] skip sequence '%s' as it is shorter than %d!\n", __func__, ks->name.s, dist + 3 * std_dev);
+			logmsg("[%s] skip sequence '%s' as it is shorter than %d!", __func__, ks->name.s, dist + 3 * std_dev);
 			continue;
 		}
 
@@ -455,9 +469,15 @@ int main(int argc, char *argv[])
 	if (argc - optind < 4) return simu_usage();
     n_taxa = atoi(argv[optind+1]);
 	fpout1 = fopen(argv[optind+2], "w");
-	fpout2 = fopen(argv[optind+3], "w");
+    int interleave = strcmp(argv[optind+2], argv[optind+3]);
+    if (interleave == 0) {
+        logmsg("[wgsim] Interleaving output");
+        fpout2 = fpout1;
+    } else {
+	    fpout2 = fopen(argv[optind+3], "w");
+    }
 	if (!fpout1 || !fpout2) {
-		fprintf(stderr, "[wgsim] file open error\n");
+		logmsg("[wgsim] file open error");
 		return 1;
 	}
 	//if (seed <= 0) seed = time(0)&0x7fffffff;
@@ -467,11 +487,11 @@ int main(int argc, char *argv[])
 	//srand48(seed);
 	//xsrand(seed-1513299303);
 	xsrand(seed);
-	fprintf(stderr, "[wgsim] seed = %d, rseed = %d\n", seed, rseed);
+	logmsg("[wgsim] seed = %d, rseed = %d", seed, rseed);
 
-    fprintf(stderr, "[wgsim] sampling tree\n");
+    logmsg("[wgsim] sampling tree");
     char ** leaves = sample_tree(argv[optind], n_taxa);
-    fprintf(stderr, "[wgsim] calculating abundances\n");
+    logmsg("[wgsim] calculating abundances");
     double * abund = calc_abund(n_taxa);
     double Ltot = 0.0;
     ref_t * refs = (ref_t*) malloc(n_taxa*sizeof(ref_t));
@@ -481,7 +501,7 @@ int main(int argc, char *argv[])
         fn = (char *) malloc(128*sizeof(char));
         snprintf(fn, 128, "%s/%s.fasta", indir, leaves[i]);
         read_seq(fn, tmp_ref);
-        fprintf(stderr, "Looking for %s in %s. Found %lld bases in %d sequences\n", leaves[i], fn, (long long) tmp_ref->tot_len, tmp_ref->n_ref);
+        logmsg("[wgsim] Looking for %s in %s. Found %lld bases in %d sequences", leaves[i], fn, (long long) tmp_ref->tot_len, tmp_ref->n_ref);
         tmp_ref->wlen = abund[i] * tmp_ref->tot_len;
         Ltot += tmp_ref->wlen;
         tmp_ref++;
@@ -490,12 +510,17 @@ int main(int argc, char *argv[])
     uint64_t n_pairs;
     for (i = 0; i < n_taxa; i++){
         n_pairs = (uint64_t) tmp_ref->wlen*N/Ltot;
+        logmsg("[wgsim] Sampling %lld (%0.12f) pairs from %s", (long long) n_pairs, abund[i], tmp_ref->fn);
 	    wgsim_core(fpout1, fpout2, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
         tmp_ref++;
     }
+    logmsg("[wgsim] Done sampling reads");
 
-	//wgsim_core(fpout1, fpout2, argv[optind], is_hap, N, dist, std_dev, size_l, size_r);
 
-	fclose(fpout1); fclose(fpout2);
+	fclose(fpout1);
+    if (interleave != 0) {
+        fclose(fpout2);
+    }
+    logmsg("[wgsim] Closed outputs");
 	return 0;
 }
