@@ -166,7 +166,6 @@ char ** sample_tree(char * nwk_path, int nsamples) {
         idx = binsearch(cum_weights, 0, rem_leaves, U); // get index
         shift_weights(cum_weights, idx, rem_leaves);    // update weights
         tmp = node_ids[idx];
-        fprintf(stderr, "before: %s, r = %0.12f\n", names[node_ids[idx]], r); 
         node_ids[idx] = node_ids[rem_leaves-1];
         node_ids[rem_leaves-1] = tmp;
         rem_leaves--;
@@ -178,7 +177,6 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     }
     char ** ret = (char **) malloc(nsamples * sizeof(char *));
     for (i = tmp; i < nleaves; i++){
-        fprintf(stderr, "after: %s\n", names[node_ids[i]]); 
         ret[i-tmp] = names[node_ids[i]];
     }
     free(curr_dist);
