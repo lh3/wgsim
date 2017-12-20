@@ -4,6 +4,14 @@
 #include <math.h>
 #include "xrand.h"
 
+typedef struct __tree_sampler {
+    char ** names;
+    double * cum_weights;
+    int * node_ids;
+    int rem_leaves;
+
+} tree_sampler; 
+
 void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** names, int * id) {
     char * nwk = *nwk_ptr;
     char *name = malloc(256), *blen = malloc(256);
@@ -187,6 +195,90 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     free(names);
     return ret;
 }
+
+tree_sampler * sampler_init(char * nwk_path){
+    FILE *file = fopen(nwk_path, "r");
+    char *code;
+    size_t n = 0;
+    int c;
+
+    if (file == NULL) return NULL; //could not open file
+    // compute file size
+    fseek(file, 0, SEEK_END);
+    long f_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    code = (char *) malloc(f_size);
+
+    // read in newick string
+    int internodes_n = 0;
+    while ((c = fgetc(file)) != EOF) {
+        if (c == 10 || c == 32 || c == 9) {
+            continue;
+        }
+        if (c == 44)
+            internodes_n++;
+        code[n++] = (char)c;
+    }
+    code[n] = '\0';
+
+    // allocate distance and weights
+    int nleaves = internodes_n+1;
+    double * curr_dist = (double *) malloc(sizeof(double)*(nleaves));
+    double * weights = (double *) malloc(sizeof(double)*(nleaves));
+    char ** names = (char **) malloc(sizeof(char*)*(nleaves));
+    int i;
+    for (i = 0; i <= internodes_n; i++){
+        curr_dist[i] = 0.0;
+        weights[i] = 0.0;
+    }
+
+    // parse newick string and compute weights
+    i = 0;
+    int * id = &i;
+    char * nwk_ptr = code;
+    read_tree(&nwk_ptr, curr_dist, weights, names, id);
+    free(curr_dist);
+    free(code);
+
+    // compute cumulative weights
+    double * cum_weights = (double*) malloc(sizeof(double)*nleaves);
+    double sum = 0.0;
+    for (i = 0; i < nleaves; i++){
+        sum += weights[i];
+        cum_weights[i] = sum;
+    }
+    free(weights);
+
+    // allocate node ids to keep track of samples
+    int * node_ids = (int*) malloc(nleaves*sizeof(int));
+    for (i = 0; i < nleaves; i++){
+        node_ids[i] = i;
+    }
+
+    tree_sampler * ret = (tree_sampler *) malloc(sizeof(tree_sampler));
+    ret->cum_weights = cum_weights;
+    ret->node_ids = node_ids;
+    ret->names = names;
+    ret->rem_leaves = nleaves;;
+
+    return ret;
+}
+
+int next_leaf(tree_sampler * ts){
+    double * cum_weights = ts->cum_weights;
+    int rem_leaves = ts->rem_leaves;
+    int * node_ids = ts->node_ids;
+    double U = cum_weights[rem_leaves-1]*xdrand();       // draw random number
+    int idx = binsearch(cum_weights, 0, rem_leaves, U);  // get index
+    shift_weights(cum_weights, idx, rem_leaves);         // update weights
+    int tmp = node_ids[idx];
+    node_ids[idx] = node_ids[rem_leaves-1];
+    node_ids[rem_leaves-1] = tmp;
+    ts->rem_leaves--;
+    return tmp;
+}
+
+
 
 double * calc_abund(int nsamples) {
     double * abundance = (double *) malloc(sizeof(double)*nsamples);
