@@ -325,13 +325,9 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 
 			// flip or not
 			if (xdrand() < 0.5) { // drand48
-				//fpo[0] = fpout1; fpo[1] = fpout2;
-				//s[0] = size[0]; s[1] = size[1];
                 order[0] = 0;
                 order[1] = 1;
 			} else {
-				//fpo[1] = fpout1; fpo[0] = fpout2;
-				//s[1] = size[0]; s[0] = size[1];
                 order[0] = 1;
                 order[1] = 0;
 				is_flip = 1;
