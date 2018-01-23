@@ -112,6 +112,7 @@ typedef struct {
 } mutseq_t;
 
 typedef struct {
+    char * id;
     const char * fn; /* the fasta file path */
     uint64_t tot_len;
     uint64_t wlen;
@@ -262,6 +263,7 @@ void read_seq(const char *fn, ref_t * ref){
 	while ((l = kseq_read(ks)) >= 0) {
 		tot_len += l;
 		++n_ref;
+        // ks->seq.s should be the sequence
 	}
 
     ref->fn = fn;
@@ -394,7 +396,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
                 j = order[k];
 				for (i = 0; i < s[j]; ++i) qstr[i] = Q;
 				qstr[i] = 0;
-				fprintf(fpo[j], "@%s_%u_%u_%d:%d:%d_%d:%d:%d_%llx/%d\n", ks->name.s, ext_coor[0]+1, ext_coor[1]+1,
+				fprintf(fpo[j], "@%s:%s_%u_%u_%d:%d:%d_%d:%d:%d_%llx/%d\n", ref->id, ks->name.s, ext_coor[0]+1, ext_coor[1]+1,
 						n_err[0], n_sub[0], n_indel[0], n_err[1], n_sub[1], n_indel[1],
 						(long long)ii, j==0? is_flip+1 : 2-is_flip);
 				for (i = 0; i < s[j]; ++i)
@@ -479,13 +481,10 @@ int main(int argc, char *argv[])
 	//if (seed <= 0) seed = time(0)&0x7fffffff;
 	if (seed <= 0) seed = time(NULL);
     srand(seed);
-    int rseed = rand();
-	//srand48(seed);
-	//xsrand(seed-1513299303);
 	xsrand(seed);
-	logmsg("[wgsim] seed = %d, rseed = %d", seed, rseed);
+	logmsg("[wgsim] seed = %d", seed);
 
-    logmsg("[wgsim] sampling tree");
+    logmsg("[wgsim] sampling tree %s, getting sequence from %s", argv[optind], indir);
     char ** leaves = sample_tree(argv[optind], n_taxa);
     logmsg("[wgsim] calculating abundances");
     double * abund = calc_abund(n_taxa);
@@ -496,8 +495,9 @@ int main(int argc, char *argv[])
     for (i = 0; i < n_taxa; i++) {
         fn = (char *) malloc(128*sizeof(char));
         snprintf(fn, 128, "%s/%s.fasta", indir, leaves[i]);
-        read_seq(fn, tmp_ref);
+        tmp_ref->id = leaves[i];
         logmsg("[wgsim] Looking for %s in %s. Found %lld bases in %d sequences", leaves[i], fn, (long long) tmp_ref->tot_len, tmp_ref->n_ref);
+        read_seq(fn, tmp_ref);
         tmp_ref->wlen = abund[i] * tmp_ref->tot_len;
         Ltot += tmp_ref->wlen;
         tmp_ref++;
