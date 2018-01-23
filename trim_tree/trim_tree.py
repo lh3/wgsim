@@ -142,7 +142,8 @@ def _nwk_descend_left(node, stack, nwk):
         node = node.left
         if node is not None:
             nwk += "("
-    nwk += "%s:%.2g" % (prev.name, prev.blen)
+    nwk += "%s:%.5f" % (prev.name, prev.blen)
+    stack.pop()
     return nwk
 
 def to_nwk(node):
@@ -150,14 +151,23 @@ def to_nwk(node):
     parents = list()
     ret = _nwk_descend_left(node, parents, ret)
 
+    last_split = list()
+    #last_split.append(node)
     while parents:
         tmp = parents.pop()
-        if len(tmp.name) == 0: # leaf node
+        if len(last_split) > 0 and last_split[-1] == tmp:
+            ret += "):%.5f" % tmp.blen
+            last_split.pop()
+            continue
+        if len(tmp.name) == 0: # internode
             ret += ","
+            last_split.append(tmp)
+            parents.append(tmp)
             ret = _nwk_descend_left(tmp.right, parents, ret)
-            if parents[-1] == tmp.right:
-                ret += "):%.2g" % tmp.blen
-    ret += "):%.2g" % node.blen
+        #else:
+            #if len(parents) > 0 and parents[-1] == tmp.right:
+            #    ret += "):%.2g" % tmp.blen
+    ret += ";"
     return ret
 
 def to_str(node):
