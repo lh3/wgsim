@@ -27,6 +27,10 @@
 /* This program is separated from maq's read simulator with Colin
  * Hercus' modification to allow longer indels. */
 
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
@@ -180,7 +184,7 @@ void wgsim_mut_diref(const kseq_t *ks, int is_hap, mutseq_t *hap1, mutseq_t *hap
 		}
 	}
 }
-void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, mutseq_t *hap2)
+void wgsim_print_mutref(char* id, const char *name, const kseq_t *ks, mutseq_t *hap1, mutseq_t *hap2)
 {
 	int i, j = 0; // j keeps the end of the last deletion
 	for (i = 0; i != ks->seq.l; ++i) {
@@ -191,16 +195,16 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
 		if ((c[1] & mutmsk) != NOCHANGE || (c[2] & mutmsk) != NOCHANGE) {
 			if (c[1] == c[2]) { // hom
 				if ((c[1]&mutmsk) == SUBSTITUTE) { // substitution
-					printf("%s\t%d\t%c\t%c\t-\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
+					printf("%s\t%s\t%d\t%c\t%c\t-\n", id, name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
 				} else if ((c[1]&mutmsk) == DELETE) { // del
 					if (i >= j) {
-						printf("%s\t%d\t", name, i+1);
+						printf("%s\t%s\t%d\t", id, name, i+1);
 						for (j = i; j < ks->seq.l && hap1->s[j] == hap2->s[j] && (hap1->s[j]&mutmsk) == DELETE; ++j)
 							putchar("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]]);
 						printf("\t-\t-\n");
 					}
 				} else if (((c[1] & mutmsk) >> 12) <= 4) { // ins
-					printf("%s\t%d\t-\t", name, i+1);
+					printf("%s\t%s\t%d\t-\t", id, name, i+1);
                     int n = (c[1]&mutmsk) >> 12, ins = c[1] >> 4;
                     while (n > 0) {
                         putchar("ACGTN"[ins & 0x3]);
@@ -211,23 +215,23 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
 				} // else: deleted base in a long deletion
 			} else { // het
 				if ((c[1]&mutmsk) == SUBSTITUTE || (c[2]&mutmsk) == SUBSTITUTE) { // substitution
-					printf("%s\t%d\t%c\t%c\t+\n", name, i+1, "ACGTN"[c[0]], "XACMGRSVTWYHKDBN"[1<<(c[1]&0x3)|1<<(c[2]&0x3)]);
+					printf("%s\t%s\t%d\t%c\t%c\t+\n", id, name, i+1, "ACGTN"[c[0]], "XACMGRSVTWYHKDBN"[1<<(c[1]&0x3)|1<<(c[2]&0x3)]);
 				} else if ((c[1]&mutmsk) == DELETE) {
 					if (i >= j) {
-						printf("%s\t%d\t", name, i+1);
+						printf("%s\t%s\t%d\t", id, name, i+1);
 						for (j = i; j < ks->seq.l && hap1->s[j] != hap2->s[j] && (hap1->s[j]&mutmsk) == DELETE; ++j)
 							putchar("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]]);
 						printf("\t-\t-\n");
 					}
 				} else if ((c[2]&mutmsk) == DELETE) {
 					if (i >= j) {
-						printf("%s\t%d\t", name, i+1);
+						printf("%s\t%s\t%d\t", id, name, i+1);
 						for (j = i; j < ks->seq.l && hap1->s[j] != hap2->s[j] && (hap2->s[j]&mutmsk) == DELETE; ++j)
 							putchar("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]]);
 						printf("\t-\t-\n");
 					}
 				} else if (((c[1] & mutmsk) >> 12) <= 4 && ((c[1] & mutmsk) >> 12) > 0) { // ins1
-					printf("%s\t%d\t-\t", name, i+1);
+					printf("%s\t%s\t%d\t-\t", id, name, i+1);
                     int n = (c[1]&mutmsk) >> 12, ins = c[1] >> 4;
                     while (n > 0) {
                         putchar("ACGTN"[ins & 0x3]);
@@ -236,7 +240,7 @@ void wgsim_print_mutref(const char *name, const kseq_t *ks, mutseq_t *hap1, muts
                     }
                     printf("\t+\n");
 				} else if (((c[2] & mutmsk) >> 12) <= 4 || ((c[2] & mutmsk) >> 12) > 0) { // ins2
-					printf("%s\t%d\t-\t", name, i+1);
+					printf("%s\t%s\t%d\t-\t", id, name, i+1);
                     int n = (c[2]&mutmsk) >> 12, ins = c[2] >> 4;
                     while (n > 0) {
                         putchar("ACGTN"[ins & 0x3]);
@@ -275,13 +279,14 @@ void read_seq(const char *fn, ref_t * ref){
 	gzclose(fp_fa);
 }
 
-void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
+uint64_t wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
 {
 	kseq_t *ks;
     mutseq_t rseq[2];
 	gzFile fp_fa;
 	uint64_t ii;
 	int i, l;
+    uint64_t actual_n_pairs = 0;
 	char *qstr;
 	int /*size[2],*/ Q, max_size;
 	uint8_t *tmp_seq[2];
@@ -301,13 +306,13 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 	while ((l = kseq_read(ks)) >= 0) {
 		uint64_t n_pairs = (uint64_t)((long double)l / ref->tot_len * N + 0.5);
 		if (l < dist + 3 * std_dev) {
-			logmsg("[%s] skip sequence '%s' as it is shorter than %d!", __func__, ks->name.s, dist + 3 * std_dev);
+			logmsg("[%s] skip sequence '%s' from %s as it is shorter than %d!", __func__, ks->name.s, ref->id, dist + 3 * std_dev);
 			continue;
 		}
 
 		// generate mutations and print them out
 		wgsim_mut_diref(ks, is_hap, rseq, rseq+1);
-		wgsim_print_mutref(ks->name.s, ks, rseq, rseq+1);
+		wgsim_print_mutref(ref->id, ks->name.s, ks, rseq, rseq+1);
 
 	    FILE *fpo[] = { fpout1, fpout2 };
         int s[] = { size_l, size_r };
@@ -403,6 +408,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 					fputc("ACGTN"[(int)tmp_seq[j][i]], fpo[j]);
 				fprintf(fpo[j], "\n+\n%s\n", qstr);
 			}
+            actual_n_pairs++;
 		}
 		free(rseq[0].s); free(rseq[1].s);
 	}
@@ -410,6 +416,7 @@ void wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N,
 	gzclose(fp_fa);
 	free(qstr);
 	free(tmp_seq[0]); free(tmp_seq[1]);
+    return actual_n_pairs;
 }
 
 static int simu_usage()
@@ -418,7 +425,7 @@ static int simu_usage()
 	fprintf(stderr, "Program: wgsim (short read simulator)\n");
 	fprintf(stderr, "Version: %s\n", PACKAGE_VERSION);
 	fprintf(stderr, "Contact: Andrew Tritt <ajtritt@lbl.gov>\n\n");
-	fprintf(stderr, "Usage:   wgsim [options] <in.nwk> <num_taxa> <out.read1.fq> <out.read2.fq>\n\n");
+	fprintf(stderr, "Usage:   wgsim [options] <in.nwk> <num_taxa>\n\n");
 	fprintf(stderr, "Options: -e FLOAT      base error rate [%.3f]\n", ERR_RATE);
 	fprintf(stderr, "         -d INT        outer distance between the two ends [270]\n");
 	fprintf(stderr, "         -s INT        standard deviation [50]\n");
@@ -432,6 +439,8 @@ static int simu_usage()
 	fprintf(stderr, "         -A FLOAT      discard if the fraction of ambiguous bases higher than FLOAT [%.2f]\n", MAX_N_RATIO);
 	fprintf(stderr, "         -h            haplotype mode\n");
 	fprintf(stderr, "         -f STR        the directory containing input FastA files [.]\n");
+	fprintf(stderr, "         -o STR        the directory to write files output files to [.]\n");
+	fprintf(stderr, "         -I            interlaved output\n");
 	fprintf(stderr, "\n");
 	return 1;
 }
@@ -439,15 +448,16 @@ static int simu_usage()
 int main(int argc, char *argv[])
 {
 	int64_t N;
-	int dist, std_dev, c, size_l, size_r, is_hap = 0;
-	FILE *fpout1, *fpout2;
+	int dist, std_dev, c, size_l, size_r, is_hap = 0, ileave = 0;
+	FILE *fpout1, *fpout2, *about;
 	int seed = -1;
     int n_taxa, i;
     char * indir = ".";
+    char * outdir = ".";
 
 	N = 1000000; dist = 270; std_dev = 50;
 	size_l = size_r = 150;
-	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S:A:f:")) >= 0) {
+	while ((c = getopt(argc, argv, "e:d:s:N:1:2:r:R:hX:S:A:f:o:I")) >= 0) {
 		switch (c) {
 		case 'd': dist = atoi(optarg); break;
 		case 's': std_dev = atoi(optarg); break;
@@ -462,17 +472,30 @@ int main(int argc, char *argv[])
 		case 'S': seed = atoi(optarg); break;
 		case 'h': is_hap = 1; break;
 		case 'f': indir = optarg; break;
+		case 'o': outdir = optarg; break;
+		case 'I': ileave = 1; break;
 		}
 	}
-	if (argc - optind < 4) return simu_usage();
+
+    struct stat sb;
+    if (!(stat(outdir, &sb) == 0 && S_ISDIR(sb.st_mode))){
+        mkdir(outdir, 0755);
+    }
+
+
+	if (argc - optind < 2) return simu_usage();
     n_taxa = atoi(argv[optind+1]);
-	fpout1 = fopen(argv[optind+2], "w");
-    int interleave = strcmp(argv[optind+2], argv[optind+3]);
-    if (interleave == 0) {
+    char outpath[128];
+    if (ileave == 1) {
         logmsg("[wgsim] Interleaving output");
+        snprintf(outpath, 128, "%s/reads.fastq", outdir);
+	    fpout1 = fopen(outpath, "w");
         fpout2 = fpout1;
     } else {
-	    fpout2 = fopen(argv[optind+3], "w");
+        snprintf(outpath, 128, "%s/reads_1.fastq", outdir);
+	    fpout1 = fopen(outpath, "w");
+        snprintf(outpath, 128, "%s/reads_2.fastq", outdir);
+	    fpout2 = fopen(outpath, "w");
     }
 	if (!fpout1 || !fpout2) {
 		logmsg("[wgsim] file open error");
@@ -483,8 +506,8 @@ int main(int argc, char *argv[])
     srand(seed);
 	xsrand(seed);
 	logmsg("[wgsim] seed = %d", seed);
-
     logmsg("[wgsim] sampling tree %s, getting sequence from %s", argv[optind], indir);
+    logmsg("[wgsim] fragment size mean = %d, fragment size stdev = %d", dist, std_dev);
     char ** leaves = sample_tree(argv[optind], n_taxa);
     logmsg("[wgsim] calculating abundances");
     double * abund = calc_abund(n_taxa);
@@ -495,26 +518,30 @@ int main(int argc, char *argv[])
     for (i = 0; i < n_taxa; i++) {
         fn = (char *) malloc(128*sizeof(char));
         snprintf(fn, 128, "%s/%s.fasta", indir, leaves[i]);
-        tmp_ref->id = leaves[i];
-        logmsg("[wgsim] Looking for %s in %s. Found %lld bases in %d sequences", leaves[i], fn, (long long) tmp_ref->tot_len, tmp_ref->n_ref);
+        logmsg("[wgsim] Looking for %s in %s.", leaves[i], fn);
         read_seq(fn, tmp_ref);
+        tmp_ref->id = leaves[i];
         tmp_ref->wlen = abund[i] * tmp_ref->tot_len;
         Ltot += tmp_ref->wlen;
         tmp_ref++;
     }
     tmp_ref = refs;
+    snprintf(outpath, 128, "%s/abundance.txt", outdir);
+    about = fopen(outpath, "w");
     uint64_t n_pairs;
+    uint64_t actual;
     for (i = 0; i < n_taxa; i++){
         n_pairs = (uint64_t) tmp_ref->wlen*N/Ltot;
         logmsg("[wgsim] Sampling %lld (%0.12f) pairs from %s", (long long) n_pairs, abund[i], tmp_ref->fn);
-	    wgsim_core(fpout1, fpout2, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
+	    actual = wgsim_core(fpout1, fpout2, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
+        fprintf(about, "%s\t%s\t%0.12f\t%lld\n", tmp_ref->id, tmp_ref->fn, abund[i], (long long) actual);
         tmp_ref++;
     }
     logmsg("[wgsim] Done sampling reads");
 
-
+    fclose(about);
 	fclose(fpout1);
-    if (interleave != 0) {
+    if (ileave != 1) {
         fclose(fpout2);
     }
     logmsg("[wgsim] Closed outputs");
