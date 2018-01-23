@@ -184,7 +184,7 @@ void wgsim_mut_diref(const kseq_t *ks, int is_hap, mutseq_t *hap1, mutseq_t *hap
 		}
 	}
 }
-void wgsim_print_mutref(char* id, const char *name, const kseq_t *ks, mutseq_t *hap1, mutseq_t *hap2)
+void wgsim_print_mutref(FILE * out, char* id, const char *name, const kseq_t *ks, mutseq_t *hap1, mutseq_t *hap2)
 {
 	int i, j = 0; // j keeps the end of the last deletion
 	for (i = 0; i != ks->seq.l; ++i) {
@@ -195,59 +195,59 @@ void wgsim_print_mutref(char* id, const char *name, const kseq_t *ks, mutseq_t *
 		if ((c[1] & mutmsk) != NOCHANGE || (c[2] & mutmsk) != NOCHANGE) {
 			if (c[1] == c[2]) { // hom
 				if ((c[1]&mutmsk) == SUBSTITUTE) { // substitution
-					printf("%s\t%s\t%d\t%c\t%c\t-\n", id, name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
+					fprintf(out, "%s\t%s\t%d\t%c\t%c\t-\n", id, name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
 				} else if ((c[1]&mutmsk) == DELETE) { // del
 					if (i >= j) {
-						printf("%s\t%s\t%d\t", id, name, i+1);
+						fprintf(out, "%s\t%s\t%d\t", id, name, i+1);
 						for (j = i; j < ks->seq.l && hap1->s[j] == hap2->s[j] && (hap1->s[j]&mutmsk) == DELETE; ++j)
-							putchar("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]]);
-						printf("\t-\t-\n");
+							fputc("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]], out);
+						fprintf(out, "\t-\t-\n");
 					}
 				} else if (((c[1] & mutmsk) >> 12) <= 4) { // ins
-					printf("%s\t%s\t%d\t-\t", id, name, i+1);
+					fprintf(out, "%s\t%s\t%d\t-\t", id, name, i+1);
                     int n = (c[1]&mutmsk) >> 12, ins = c[1] >> 4;
                     while (n > 0) {
-                        putchar("ACGTN"[ins & 0x3]);
+                        fputc("ACGTN"[ins & 0x3], out);
 						ins >>= 2;
                         n--;
                     }
-                    printf("\t-\n");
+                    fprintf(out, "\t-\n");
 				} // else: deleted base in a long deletion
 			} else { // het
 				if ((c[1]&mutmsk) == SUBSTITUTE || (c[2]&mutmsk) == SUBSTITUTE) { // substitution
-					printf("%s\t%s\t%d\t%c\t%c\t+\n", id, name, i+1, "ACGTN"[c[0]], "XACMGRSVTWYHKDBN"[1<<(c[1]&0x3)|1<<(c[2]&0x3)]);
+					fprintf(out, "%s\t%s\t%d\t%c\t%c\t+\n", id, name, i+1, "ACGTN"[c[0]], "XACMGRSVTWYHKDBN"[1<<(c[1]&0x3)|1<<(c[2]&0x3)]);
 				} else if ((c[1]&mutmsk) == DELETE) {
 					if (i >= j) {
-						printf("%s\t%s\t%d\t", id, name, i+1);
+						fprintf(out, "%s\t%s\t%d\t", id, name, i+1);
 						for (j = i; j < ks->seq.l && hap1->s[j] != hap2->s[j] && (hap1->s[j]&mutmsk) == DELETE; ++j)
-							putchar("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]]);
-						printf("\t-\t-\n");
+							fputc("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]], out);
+						fprintf(out, "\t-\t-\n");
 					}
 				} else if ((c[2]&mutmsk) == DELETE) {
 					if (i >= j) {
-						printf("%s\t%s\t%d\t", id, name, i+1);
+						fprintf(out, "%s\t%s\t%d\t", id, name, i+1);
 						for (j = i; j < ks->seq.l && hap1->s[j] != hap2->s[j] && (hap2->s[j]&mutmsk) == DELETE; ++j)
-							putchar("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]]);
-						printf("\t-\t-\n");
+							fputc("ACGTN"[nst_nt4_table[(int)ks->seq.s[j]]], out);
+						fprintf(out, "\t-\t-\n");
 					}
 				} else if (((c[1] & mutmsk) >> 12) <= 4 && ((c[1] & mutmsk) >> 12) > 0) { // ins1
-					printf("%s\t%s\t%d\t-\t", id, name, i+1);
+					fprintf(out, "%s\t%s\t%d\t-\t", id, name, i+1);
                     int n = (c[1]&mutmsk) >> 12, ins = c[1] >> 4;
                     while (n > 0) {
-                        putchar("ACGTN"[ins & 0x3]);
+                        fputc("ACGTN"[ins & 0x3], out);
 						ins >>= 2;
                         n--;
                     }
-                    printf("\t+\n");
+                    fprintf(out, "\t+\n");
 				} else if (((c[2] & mutmsk) >> 12) <= 4 || ((c[2] & mutmsk) >> 12) > 0) { // ins2
-					printf("%s\t%s\t%d\t-\t", id, name, i+1);
+					fprintf(out, "%s\t%s\t%d\t-\t", id, name, i+1);
                     int n = (c[2]&mutmsk) >> 12, ins = c[2] >> 4;
                     while (n > 0) {
-                        putchar("ACGTN"[ins & 0x3]);
+                        fputc("ACGTN"[ins & 0x3], out);
                         ins >>= 2;
                         n--;
                     }
-                    printf("\t+\n");
+                    fprintf(out, "\t+\n");
 				} // else: deleted base in a long deletion
 			}
 		}
@@ -279,7 +279,7 @@ void read_seq(const char *fn, ref_t * ref){
 	gzclose(fp_fa);
 }
 
-uint64_t wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
+uint64_t wgsim_core(FILE *fpout1, FILE *fpout2, FILE *mutout, ref_t * ref, int is_hap, uint64_t N, int dist, int std_dev, int size_l, int size_r)
 {
 	kseq_t *ks;
     mutseq_t rseq[2];
@@ -312,7 +312,7 @@ uint64_t wgsim_core(FILE *fpout1, FILE *fpout2, ref_t * ref, int is_hap, uint64_
 
 		// generate mutations and print them out
 		wgsim_mut_diref(ks, is_hap, rseq, rseq+1);
-		wgsim_print_mutref(ref->id, ks->name.s, ks, rseq, rseq+1);
+		wgsim_print_mutref(mutout, ref->id, ks->name.s, ks, rseq, rseq+1);
 
 	    FILE *fpo[] = { fpout1, fpout2 };
         int s[] = { size_l, size_r };
@@ -449,7 +449,7 @@ int main(int argc, char *argv[])
 {
 	int64_t N;
 	int dist, std_dev, c, size_l, size_r, is_hap = 0, ileave = 0;
-	FILE *fpout1, *fpout2, *about;
+	FILE *fpout1, *fpout2, *about, *mutout;
 	int seed = -1;
     int n_taxa, i;
     char * indir = ".";
@@ -497,6 +497,9 @@ int main(int argc, char *argv[])
         snprintf(outpath, 128, "%s/reads_2.fastq", outdir);
 	    fpout2 = fopen(outpath, "w");
     }
+    snprintf(outpath, 128, "%s/mutations.txt", outdir);
+    mutout = fopen(outpath, "w");
+
 	if (!fpout1 || !fpout2) {
 		logmsg("[wgsim] file open error");
 		return 1;
@@ -533,13 +536,14 @@ int main(int argc, char *argv[])
     for (i = 0; i < n_taxa; i++){
         n_pairs = (uint64_t) tmp_ref->wlen*N/Ltot;
         logmsg("[wgsim] Sampling %lld (%0.12f) pairs from %s", (long long) n_pairs, abund[i], tmp_ref->fn);
-	    actual = wgsim_core(fpout1, fpout2, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
+	    actual = wgsim_core(fpout1, fpout2, mutout, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
         fprintf(about, "%s\t%s\t%0.12f\t%lld\n", tmp_ref->id, tmp_ref->fn, abund[i], (long long) actual);
         tmp_ref++;
     }
     logmsg("[wgsim] Done sampling reads");
 
     fclose(about);
+    fclose(mutout);
 	fclose(fpout1);
     if (ileave != 1) {
         fclose(fpout2);
