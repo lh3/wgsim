@@ -254,10 +254,50 @@ void wgsim_print_mutref(FILE * out, char* id, const char *name, const kseq_t *ks
 	}
 }
 
-void read_seq(const char *fn, ref_t * ref){
+double perc_nuc(kseq_t * ks){
+    uint64_t len = strlen(ks->seq.s);
+    char * s = ks->seq.s;
+    uint64_t counts[128] = {
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+	    0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
+    };
+    uint64_t i;
+    for (i = 0; i < len; i++) {
+        counts[(int) *(s++)]++;
+    }
+    int idx[] = {65, 67, 71, 84};
+    double n_nucs = 0;
+    for (i = 0; i < 4; i++){
+        n_nucs += counts[idx[i]] + counts[idx[i]+32];
+    }
+    return n_nucs/len;
+}
+
+int check_seq(kseq_t *ks, double min_amb, int min_len){
+    int ret = 0;
+    int l = ks->seq.l;
+    double pn;
+    pn = perc_nuc(ks);
+    if (pn < min_amb){
+        ret += 1;
+    }
+	if (l < min_len) {
+        ret += 2;
+	}
+    return ret;
+}
+
+void read_seq(const char *fn, ref_t * ref, int min_len){
 	gzFile fp_fa;
     int l, n_ref;
     uint64_t tot_len;
+    // ks->seq.s should be the sequence
 	kseq_t *ks;
 
 	fp_fa = gzopen(fn, "r");
@@ -265,16 +305,16 @@ void read_seq(const char *fn, ref_t * ref){
 	tot_len = n_ref = 0;
     logmsg("[%s] calculating the total length of the reference sequence %s...", __func__, fn);
 	while ((l = kseq_read(ks)) >= 0) {
+        if (check_seq(ks, 0.999, min_len)) continue;
 		tot_len += l;
 		++n_ref;
-        // ks->seq.s should be the sequence
 	}
 
     ref->fn = fn;
     ref->tot_len = tot_len;
     ref->n_ref = n_ref;
 
-	logmsg("[%s] %d sequences in %s, total length: %llu", __func__, n_ref, fn, (long long)tot_len);
+	logmsg("[%s] %d useable sequences in %s, total length: %llu", __func__, n_ref, fn, (long long)tot_len);
 	kseq_destroy(ks);
 	gzclose(fp_fa);
 }
@@ -303,13 +343,17 @@ uint64_t wgsim_core(FILE *fpout1, FILE *fpout2, FILE *mutout, ref_t * ref, int i
 
 	fp_fa = gzopen(ref->fn, "r");
 	ks = kseq_init(fp_fa);
+    int ok_bit;
+    int min_len = dist + 3 * std_dev;
+    double min_nuc = 0.999;
 	while ((l = kseq_read(ks)) >= 0) {
+        ok_bit = check_seq(ks, min_nuc, min_len);
+        if (ok_bit) {
+            if (ok_bit % 2) logmsg("[%s] skip sequence '%s' (length = %d) from %s -- fraction of noniambiguous nucleotides less than %0.5f", __func__, ks->name.s, l, ref->id, min_nuc);
+            if (ok_bit / 2) logmsg("[%s] skip sequence '%s' from %s -- sequence is shorter than %d bases", __func__, ks->name.s, ref->id, min_len);
+            continue;
+        }
 		uint64_t n_pairs = (uint64_t)((long double)l / ref->tot_len * N + 0.5);
-		if (l < dist + 3 * std_dev) {
-			logmsg("[%s] skip sequence '%s' from %s as it is shorter than %d!", __func__, ks->name.s, ref->id, dist + 3 * std_dev);
-			continue;
-		}
-
 		// generate mutations and print them out
 		wgsim_mut_diref(ks, is_hap, rseq, rseq+1);
 		wgsim_print_mutref(mutout, ref->id, ks->name.s, ks, rseq, rseq+1);
@@ -522,8 +566,8 @@ int main(int argc, char *argv[])
         fn = (char *) malloc(128*sizeof(char));
         snprintf(fn, 128, "%s/%s.fasta", indir, leaves[i]);
         logmsg("[wgsim] Looking for %s in %s.", leaves[i], fn);
-        read_seq(fn, tmp_ref);
         tmp_ref->id = leaves[i];
+        read_seq(fn, tmp_ref, dist + 3 * std_dev);
         tmp_ref->wlen = abund[i] * tmp_ref->tot_len;
         Ltot += tmp_ref->wlen;
         tmp_ref++;
@@ -533,14 +577,16 @@ int main(int argc, char *argv[])
     about = fopen(outpath, "w");
     uint64_t n_pairs;
     uint64_t actual;
+    uint64_t actual_total = 0;
     for (i = 0; i < n_taxa; i++){
         n_pairs = (uint64_t) tmp_ref->wlen*N/Ltot;
         logmsg("[wgsim] Sampling %lld (%0.12f) pairs from %s", (long long) n_pairs, abund[i], tmp_ref->fn);
 	    actual = wgsim_core(fpout1, fpout2, mutout, tmp_ref, is_hap, n_pairs, dist, std_dev, size_l, size_r);
         fprintf(about, "%s\t%s\t%0.12f\t%lld\n", tmp_ref->id, tmp_ref->fn, abund[i], (long long) actual);
+        actual_total += actual;
         tmp_ref++;
     }
-    logmsg("[wgsim] Done sampling reads");
+    logmsg("[wgsim] Done sampling reads, simulated %lld actual reads", (long long) actual_total);
 
     fclose(about);
     fclose(mutout);
