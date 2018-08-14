@@ -339,7 +339,10 @@ uint64_t wgsim_core(FILE *fpout1, FILE *fpout2, FILE *mutout, ref_t * ref, int i
 	//size[0] = size_l; size[1] = size_r;
 	max_size = size_l > size_r? size_l : size_r;
 
-	Q = (ERR_RATE == 0.0)? 'I' : (int)(-10.0 * log(ERR_RATE) / log(10.0) + 0.499) + 33;
+    // make quality scores high
+	// Q = (ERR_RATE == 0.0)? 'I' : (int)(-10.0 * log(ERR_RATE) / log(10.0) + 0.499) + 33;
+    Q = 'I';
+
 
 	fp_fa = gzopen(ref->fn, "r");
 	ks = kseq_init(fp_fa);
