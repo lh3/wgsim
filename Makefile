@@ -1,5 +1,6 @@
 # the compiler: gcc for C program, define as g++ for C++
 CC = gcc
+H5CC = h5cc
 
 # compiler flags:
 #  -g    adds debugging information to the executable file
@@ -21,4 +22,4 @@ debug: wgsim.c tree.h kseq.h xrand.h
 	$(CC) $(DEBUG_FLAGS) -o wgsim wgsim.c $(LIBFLAGS)
 
 tree2dmat: tree2dmat.c tree.h
-	$(CC) $(CFLAGS) -o tree2dmat tree2dmat.c $(LIBFLAGS)
+	$(H5CC) $(CFLAGS) -o tree2dmat tree2dmat.c $(LIBFLAGS)
