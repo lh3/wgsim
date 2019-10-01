@@ -4,6 +4,7 @@
 #include <math.h>
 #include "xrand.h"
 
+
 typedef struct __tree_sampler {
     char ** names;
     double * cum_weights;
@@ -12,19 +13,21 @@ typedef struct __tree_sampler {
 
 } tree_sampler; 
 
-void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** names, int * id) {
+
+void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** names, int * id, int nleaves, int full_dmat) {
     char * nwk = *nwk_ptr;
     char *name = malloc(256), *blen = malloc(256);
     size_t name_n = 0, blen_n = 0;
+    int s, m;   // s is starting index of nodes in the left tree, m is starting index of nodes in the right tree
 
     int read_blen = 0;
     char c = *nwk;
-    int s = *id;
-    int m = *id;
+    s = *id;
+    m = *id;
     while (c != '\0') {
         if (c == '(') { // read left node
             nwk++;
-            read_tree(&nwk, curr_dist, weights, names, id);
+            read_tree(&nwk, curr_dist, weights, names, id, nleaves, full_dmat);
             m = *id;
         } else if (c == ')') { // done reading branch length
             blen[blen_n] = '\0';
@@ -37,7 +40,7 @@ void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** na
                 break;
             } else {       // read right node
                 nwk++;
-                read_tree(&nwk, curr_dist, weights, names, id);
+                read_tree(&nwk, curr_dist, weights, names, id, nleaves, full_dmat);
             }
         } else if (c == ':') {  // read branch length
             if (name_n > 0){   // we were reading a leaf node
@@ -56,16 +59,26 @@ void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** na
         }
         c = *nwk;
     }
-    int e = *id;
-    assert( m <  e);
+    int e = *id;    // the end index of nodes in the right tree
+    assert( s <= m );
+    assert( m < e );
     (*nwk_ptr) = nwk;
     int i, j;
     double tmp;
-    for (i = s; i < m; i++){
-        for (j = m; j < e; j++){
-            tmp = curr_dist[i] + curr_dist[j];
-            weights[i] += tmp;
-            weights[j] += tmp;
+    if (full_dmat) {
+        for (i = s; i < m; i++){
+            for (j = m; j < e; j++){
+                tmp = curr_dist[i] + curr_dist[j];
+                weights[i * nleaves + j - ((i+1)*(i+2))/2] = tmp;
+            }
+        }
+    } else {
+        for (i = s; i < m; i++){
+            for (j = m; j < e; j++){
+                tmp = curr_dist[i] + curr_dist[j];
+                weights[i] += tmp;
+                weights[j] += tmp;
+            }
         }
     }
     tmp = atof(blen);
@@ -146,7 +159,7 @@ char ** sample_tree(char * nwk_path, int nsamples) {
     i = 0;
     int * id = &i;
     char * nwk_ptr = code;
-    read_tree(&nwk_ptr, curr_dist, weights, names, id);
+    read_tree(&nwk_ptr, curr_dist, weights, names, id, nleaves, 0);
 
     // compute cumulative weights
     double * cum_weights = (double*) malloc(sizeof(double)*nleaves);
@@ -236,7 +249,7 @@ tree_sampler * sampler_init(char * nwk_path){
     i = 0;
     int * id = &i;
     char * nwk_ptr = code;
-    read_tree(&nwk_ptr, curr_dist, weights, names, id);
+    read_tree(&nwk_ptr, curr_dist, weights, names, id, nleaves, 0);
     free(curr_dist);
     free(code);
 
