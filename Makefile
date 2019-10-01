@@ -20,3 +20,5 @@ wgsim: wgsim.c tree.h kseq.h xrand.h
 debug: wgsim.c tree.h kseq.h xrand.h
 	$(CC) $(DEBUG_FLAGS) -o wgsim wgsim.c $(LIBFLAGS)
 
+tree2dmat: tree2dmat.c tree.h
+	$(CC) $(CFLAGS) -o tree2dmat tree2dmat.c $(LIBFLAGS)
