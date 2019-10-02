@@ -15,11 +15,11 @@ DEBUG_FLAGS = -g -O0
 LIBFLAGS = -lz -lm
 
 # the build target executable:
-wgsim: wgsim.c tree.h kseq.h xrand.h
+wgsim: wgsim.c tree.h kseq.h xrand.h utils.h
 	$(CC) $(CFLAGS) -o wgsim wgsim.c $(LIBFLAGS)
 
-debug: wgsim.c tree.h kseq.h xrand.h
+debug: wgsim.c tree.h kseq.h xrand.h utils.h
 	$(CC) $(DEBUG_FLAGS) -o wgsim wgsim.c $(LIBFLAGS)
 
-tree2dmat: tree2dmat.c tree.h
+tree2dmat: tree2dmat.c tree.h utils.h
 	$(H5CC) $(CFLAGS) -o tree2dmat tree2dmat.c $(LIBFLAGS)

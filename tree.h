@@ -11,7 +11,7 @@ typedef struct __tree_sampler {
     int * node_ids;
     int rem_leaves;
 
-} tree_sampler; 
+} tree_sampler;
 
 
 void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** names, int * id, int nleaves, int full_dmat) {
@@ -62,6 +62,7 @@ void read_tree(char ** nwk_ptr, double * curr_dist, double * weights, char ** na
     int e = *id;    // the end index of nodes in the right tree
     assert( s <= m );
     assert( m < e );
+    assert( m < nleaves );
     (*nwk_ptr) = nwk;
     int i, j;
     double tmp;

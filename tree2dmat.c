@@ -1,4 +1,5 @@
 #include "tree.h"
+#include "utils.h"
 #include <stdarg.h>
 #include <stdlib.h>
 #include <math.h>
@@ -44,7 +45,7 @@ int main(int argc, char *argv[])
     if (argc - optind < 1) return usage();
 
     nwk_path = argv[optind];
-    if (verbose) printf("reading Newick string from %s\n", nwk_path);
+    if (verbose) logmsg("reading Newick string from %s", nwk_path);
     file = fopen(nwk_path, "r");
 
     if (file == NULL) {
@@ -69,10 +70,11 @@ int main(int argc, char *argv[])
     code[n] = '\0';
 
     n_leaves = internodes_n+1;
-    if (verbose) printf("found %d leaves\n", n_leaves);
+    if (verbose) logmsg("found %d leaves", n_leaves);
 
     double * curr_dist = (double *) malloc(sizeof(double)*(n_leaves));
     double * weights = (double *) malloc(sizeof(double)*((n_leaves*(n_leaves-1))/2));
+    if (verbose) logmsg("computing %d weights", ((n_leaves*(n_leaves-1))/2));
     char ** names = (char **) malloc(sizeof(char*)*(n_leaves));
     for (i = 0; i < n_leaves; i++){
         curr_dist[i] = 0.0;
@@ -84,18 +86,18 @@ int main(int argc, char *argv[])
     i = 0;
     int * id = &i;
     char * nwk_ptr = code;
-    if (verbose) printf("reading branch lengths and computing distances\n");
+    if (verbose) logmsg("reading branch lengths and computing distances");
     read_tree(&nwk_ptr, curr_dist, weights, names, id, n_leaves, 1);
 
     hid_t dataset, dataspace, h5file, dtype;
     hsize_t dimsf[] = { ((n_leaves*(n_leaves-1))/2) };
 
-    if (verbose) printf("writing file to %s\n", h5_outpath);
+    if (verbose) logmsg("writing file to %s", h5_outpath);
     h5file = H5Fcreate (h5_outpath, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
     dataspace = H5Screate_simple(1, dimsf, NULL);
 
-    if (verbose) printf("writing dataset to %s\n", h5_dset_path);
+    if (verbose) logmsg("writing dataset to %s", h5_dset_path);
     dataset = H5Dcreate (h5file, h5_dset_path, H5T_IEEE_F64LE, dataspace, H5P_DEFAULT,
                 H5P_DEFAULT, H5P_DEFAULT);
 
@@ -130,5 +132,5 @@ int main(int argc, char *argv[])
     free(weights);
     free(code);
     free(names);
-    if (verbose) printf("done\n");
+    if (verbose) logmsg("done");
 }
