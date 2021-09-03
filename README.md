@@ -16,7 +16,9 @@ that comes with the package.
 Compilation
 ===========
 
+```
 gcc -g -O2 -Wall -o wgsim wgsim.c -lz -lm
+```
 
 
 History
@@ -37,30 +39,32 @@ Simulation and evaluation
 
 The command line for simulation:
 
-  wgsim -Nxxx -1yyy -d0 -S11 -e0 -rzzz hs37m.fa yyy-zzz.fq /dev/null
+    wgsim -Nxxx -1yyy -d0 -S11 -e0 -rzzz hs37m.fa yyy-zzz.fq /dev/null
 
-where yyy is the read length, zzz is the error rate and $xxx * $yyy = 10000000.
+where `yyy` is the read length, `zzz` is the error rate and
+`$xxx * $yyy = 10000000`.
 By default, 15% of polymorphisms are INDELs and their lengths are drawn from a
-geometric distribution with density 0.7*0.3^{l-1}.
+geometric distribution with density `0.7*0.3^{l-1}`.
 
 The command line for evaluation:
 
-  wgsim_eval.pl unique aln.sam | wgsim_eval.pl alneval -g 20
+    wgsim_eval.pl unique aln.sam | wgsim_eval.pl alneval -g 20
 
-The '-g' option may be changed with mappers.
+The `-g` option may be changed with mappers.
 
 
 System
 ------
 
-GCC: 4.1.2
-CPU: AMD Opteron 8350 @ 2.0GHz
-Mem: 128GB
+ * GCC: 4.1.2
+ * CPU: AMD Opteron 8350 @ 2.0GHz
+ * Mem: 128GB
 
 
 Results
 -------
 
+```
 ==================================================================================================================
                           100bp              200bp              500bp              1000bp            10000bp
                    ------------------  -----------------  -----------------  -----------------  -----------------
@@ -76,6 +80,7 @@ Results
             err%                                          0.66  0.69  2.31   0.34  0.40  0.70   0.10  0.00  0.20
             one%                                           100  99.4     0    100   100   100    100   100   100
 ==================================================================================================================
+```
 
 1) AGILE throws "Floating point exception" halfway for 100/200bp reads.  The
    default output is supposed to be PSL, but actually has an additional "score"
